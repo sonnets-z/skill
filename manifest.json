@@ -1,25 +1,70 @@
 {
   "name": "psd-layer-splitter",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "title": "电商图片图层拆分",
-  "description": "将电商图片的每个图层模块拆分成可编辑的 PSD 图层效果，并可以导出 PSD 文件",
+  "description": "将电商图片的每个图层模块拆分成可编辑的 PSD 图层效果，并可以导出 PSD 文件。支持阿里云通义万相、腾讯云智绘、百度文心一格、智谱AI、字节豆包等国内主流AI模型",
   "author": "Trae Skill",
   "icon": "icon.png",
   "category": "图像处理",
-  "tags": ["PSD", "图层", "电商", "图片处理"],
+  "tags": ["PSD", "图层", "电商", "图片处理", "AI分割", "智能分割"],
   "main": "src/index.ts",
   "requirements": {
     "trae": ">=1.0.0"
   },
   "capabilities": [
     "image_processing",
-    "file_export"
+    "file_export",
+    "ai_integration"
+  ],
+  "aiProviders": [
+    {
+      "id": "aliyun",
+      "name": "阿里云通义万相",
+      "description": "支持图像分割、主体分割、语义分割、商品分割",
+      "apiKeyEnv": "ALIYUN_API_KEY",
+      "requiresSecretKey": false,
+      "website": "https://vision.aliyun.com/"
+    },
+    {
+      "id": "tencent",
+      "name": "腾讯云智绘",
+      "description": "支持图像分割、人像分割、物品分割、语义分割",
+      "apiKeyEnv": "TENCENT_SECRET_ID",
+      "requiresSecretKey": true,
+      "secretKeyEnv": "TENCENT_SECRET_KEY",
+      "website": "https://cloud.tencent.com/document/product/1209"
+    },
+    {
+      "id": "baidu",
+      "name": "百度文心一格",
+      "description": "支持图像分割、人像分割、车辆分割、商品分割",
+      "apiKeyEnv": "BAIDU_API_KEY",
+      "requiresSecretKey": true,
+      "secretKeyEnv": "BAIDU_SECRET_KEY",
+      "website": "https://wenxin.baidu.com/"
+    },
+    {
+      "id": "zhipu",
+      "name": "智谱AI",
+      "description": "支持图像分割、语义分割、实例分割",
+      "apiKeyEnv": "ZHIPU_API_KEY",
+      "requiresSecretKey": false,
+      "website": "https://open.bigmodel.cn/"
+    },
+    {
+      "id": "doubao",
+      "name": "字节豆包",
+      "description": "支持图像分割、主体识别、语义分割",
+      "apiKeyEnv": "DOUBAO_API_KEY",
+      "requiresSecretKey": false,
+      "website": "https://www.volcengine.com/product/doubao"
+    }
   ],
   "actions": [
     {
       "id": "split-image",
-      "name": "拆分图片图层",
-      "description": "将电商图片拆分为多个可编辑的图层模块",
+      "name": "拆分图片图层（本地）",
+      "description": "使用本地算法将电商图片拆分为多个可编辑的图层模块",
       "parameters": [
         {
           "name": "imagePath",
@@ -36,6 +81,70 @@
       ]
     },
     {
+      "id": "ai-split-image",
+      "name": "AI智能拆分图层",
+      "description": "使用国内AI模型智能拆分电商图片图层，自动识别商品、文字、装饰等元素",
+      "parameters": [
+        {
+          "name": "imagePath",
+          "type": "string",
+          "required": true,
+          "description": "输入图片路径"
+        },
+        {
+          "name": "aiProvider",
+          "type": "string",
+          "required": false,
+          "description": "AI提供商：aliyun, tencent, baidu, zhipu, doubao",
+          "default": "aliyun"
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "required": false,
+          "description": "分割模式：product, semantic, instance, all",
+          "default": "product"
+        },
+        {
+          "name": "outputPath",
+          "type": "string",
+          "required": false,
+          "description": "输出 PSD 文件路径"
+        }
+      ]
+    },
+    {
+      "id": "configure-ai",
+      "name": "配置AI模型",
+      "description": "配置使用的AI模型提供商和API密钥",
+      "parameters": [
+        {
+          "name": "provider",
+          "type": "string",
+          "required": true,
+          "description": "AI提供商：aliyun, tencent, baidu, zhipu, doubao"
+        },
+        {
+          "name": "apiKey",
+          "type": "string",
+          "required": true,
+          "description": "API密钥"
+        },
+        {
+          "name": "secretKey",
+          "type": "string",
+          "required": false,
+          "description": "Secret密钥（部分提供商需要）"
+        }
+      ]
+    },
+    {
+      "id": "list-ai-providers",
+      "name": "列出AI提供商",
+      "description": "获取支持的AI模型提供商列表及功能介绍",
+      "parameters": []
+    },
+    {
       "id": "export-psd",
       "name": "导出 PSD 文件",
       "description": "将拆分后的图层导出为 PSD 文件",
@@ -43,8 +152,8 @@
         {
           "name": "layers",
           "type": "array",
-          "required": true,
-          "description": "图层数据数组"
+          "required": false,
+          "description": "图层数据数组（可选，使用当前图层）"
         },
         {
           "name": "outputPath",
@@ -53,7 +162,45 @@
           "description": "输出 PSD 文件路径"
         }
       ]
+    },
+    {
+      "id": "get-layers",
+      "name": "获取图层列表",
+      "description": "获取当前已拆分的图层列表及AI分割详情",
+      "parameters": []
+    },
+    {
+      "id": "get-segmentation-mask",
+      "name": "获取分割遮罩",
+      "description": "获取指定图层的分割遮罩图像信息",
+      "parameters": [
+        {
+          "name": "layerId",
+          "type": "string",
+          "required": true,
+          "description": "图层ID"
+        }
+      ]
+    },
+    {
+      "id": "clear-layers",
+      "name": "清空图层数据",
+      "description": "清空当前已拆分的图层数据",
+      "parameters": []
     }
   ],
-  "settings": []
+  "settings": [
+    {
+      "id": "defaultAiProvider",
+      "type": "string",
+      "default": "aliyun",
+      "description": "默认AI提供商"
+    },
+    {
+      "id": "fallbackEnabled",
+      "type": "boolean",
+      "default": true,
+      "description": "AI服务不可用时是否使用本地分割作为备选"
+    }
+  ]
 }
