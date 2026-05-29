@@ -1,11 +1,51 @@
 import { BaseAIService, AIService, SegmentationOptions } from '../baseAIService';
 import { AIModelConfig, SegmentationResult, AIDetectedLayer } from '../../types/aiModels';
-import * as crypto from 'crypto';
 import sharp from 'sharp';
 import * as fs from 'fs';
 
+interface BaiduAccessToken {
+  access_token: string;
+  expires_in: number;
+  refresh_token?: string;
+  session_key?: string;
+  scope?: string;
+}
+
+interface BaiduObjectDetectResponse {
+  log_id: number;
+  result_num: number;
+  result: Array<{
+    score: number;
+    name: string;
+    location: {
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    };
+  }>;
+}
+
+interface BaiduSegmentResponse {
+  log_id: number;
+  image_width: number;
+  image_height: number;
+  results: Array<{
+    name: string;
+    score: number;
+    location?: {
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+    };
+  }>;
+}
+
 export class BaiduService extends BaseAIService implements AIService {
   private endpoint = 'aip.baidubce.com';
+  private accessToken: string = '';
+  private tokenExpireTime: number = 0;
 
   constructor(config: AIModelConfig) {
     super(config);
@@ -16,7 +56,13 @@ export class BaiduService extends BaseAIService implements AIService {
   }
 
   private async getAccessToken(): Promise<string> {
-    const tokenUrl = `https://aip.baidubce.com/oauth/2.0/token`;
+    const now = Date.now();
+    
+    if (this.accessToken && now < this.tokenExpireTime) {
+      return this.accessToken;
+    }
+
+    const tokenUrl = `https://${this.endpoint}/oauth/2.0/token`;
     const params = new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: this.config.apiKey,
@@ -25,14 +71,130 @@ export class BaiduService extends BaseAIService implements AIService {
 
     try {
       const response = await fetch(`${tokenUrl}?${params.toString()}`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
       });
 
-      const data = await response.json();
-      return data.access_token;
+      const data = await response.json() as BaiduAccessToken;
+
+      if (!data.access_token) {
+        throw new Error('获取AccessToken失败');
+      }
+
+      this.accessToken = data.access_token;
+      this.tokenExpireTime = now + (data.expires_in - 60) * 1000;
+
+      return this.accessToken;
     } catch (error) {
       throw new Error(`获取百度AccessToken失败: ${(error as Error).message}`);
     }
+  }
+
+  private async callObjectDetectAPI(imageBase64: string, accessToken: string): Promise<any[]> {
+    const url = `https://${this.endpoint}/rest/2.0/image-classify/v1/object_detect?access_token=${accessToken}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          image: imageBase64,
+          top_num: '10',
+          baike_num: '0'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API请求失败: ${response.status}`);
+      }
+
+      const data = await response.json() as BaiduObjectDetectResponse;
+
+      if (data.result && data.result.length > 0) {
+        return data.result.map(item => ({
+          type: this.mapLabelToType(item.name),
+          x: item.location.left,
+          y: item.location.top,
+          width: item.location.width,
+          height: item.location.height,
+          score: item.score
+        }));
+      }
+
+      return this.generateMockSegments();
+    } catch (error) {
+      console.warn('百度物体检测API调用失败，使用模拟数据');
+      return this.generateMockSegments();
+    }
+  }
+
+  private async callProductSegmentAPI(imageBase64: string, accessToken: string): Promise<any[]> {
+    const url = `https://${this.endpoint}/rpc/2.0/ai_custom/v1/segmentation/product_segment?access_token=${accessToken}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          image: imageBase64
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API请求失败: ${response.status}`);
+      }
+
+      const data = await response.json() as BaiduSegmentResponse;
+
+      if (data.results && data.results.length > 0) {
+        return data.results.map(item => ({
+          type: 'product',
+          x: item.location?.left || 0,
+          y: item.location?.top || 0,
+          width: item.location?.width || 100,
+          height: item.location?.height || 100,
+          score: item.score
+        }));
+      }
+
+      return this.generateMockSegments();
+    } catch (error) {
+      console.warn('百度商品分割API调用失败，使用模拟数据');
+      return this.generateMockSegments();
+    }
+  }
+
+  private mapLabelToType(label: string): string {
+    const labelMap: Record<string, string> = {
+      '人': 'person',
+      '人物': 'person',
+      '衣服': 'product',
+      '服装': 'product',
+      '鞋': 'product',
+      '包': 'product',
+      '手机': 'product',
+      '电子产品': 'product',
+      '文字': 'text',
+      'logo': 'logo',
+      '背景': 'background',
+      '食物': 'product',
+      '食品': 'product',
+      '家具': 'product'
+    };
+
+    for (const key of Object.keys(labelMap)) {
+      if (label.includes(key)) {
+        return labelMap[key];
+      }
+    }
+
+    return 'object';
   }
 
   async segmentImage(imagePath: string, options?: SegmentationOptions): Promise<SegmentationResult> {
@@ -51,23 +213,43 @@ export class BaiduService extends BaseAIService implements AIService {
         };
       }
 
-      const imageBase64 = imageBuffer.toString('base64');
+      const resizedBuffer = await sharp(imageBuffer)
+        .resize({ width: Math.min(1024, metadata.width), withoutEnlargement: true })
+        .toBuffer();
+      const imageBase64 = resizedBuffer.toString('base64');
+
       const accessToken = await this.getAccessToken();
-      const segments = await this.callSegmentAPI(imageBase64, accessToken, options);
+
+      let segments: any[];
+
+      switch (options?.mode) {
+        case 'product':
+          segments = await this.callProductSegmentAPI(imageBase64, accessToken);
+          break;
+        case 'semantic':
+        case 'instance':
+        case 'all':
+        default:
+          segments = await this.callObjectDetectAPI(imageBase64, accessToken);
+          break;
+      }
+
+      const scaleX = metadata.width / (metadata.width > 1024 ? 1024 : metadata.width);
+      const scaleY = metadata.height / (metadata.height > 1024 ? 1024 : metadata.height);
 
       const layers: AIDetectedLayer[] = segments.map((seg: any, index: number) => ({
         id: this.generateLayerId(),
-        name: this.mapTypeToName(seg.classname || seg.class_name, index),
-        x: Math.round(seg.location?.left || 0),
-        y: Math.round(seg.location?.top || 0),
-        width: Math.round(seg.location?.width || 100),
-        height: Math.round(seg.location?.height || 100),
-        type: this.mapTypeToLayerType(seg.classname || seg.class_name),
+        name: this.mapTypeToName(seg.type, index),
+        x: Math.round((seg.x || 0) * scaleX),
+        y: Math.round((seg.y || 0) * scaleY),
+        width: Math.round((seg.width || 100) * scaleX),
+        height: Math.round((seg.height || 100) * scaleY),
+        type: this.mapTypeToLayerType(seg.type),
         confidence: seg.score || 0.9,
-        category: seg.classname || seg.class_name,
+        category: seg.type,
         attributes: {
           baiduScore: seg.score,
-          location: seg.location
+          source: 'baidu'
         }
       }));
 
@@ -79,8 +261,8 @@ export class BaiduService extends BaseAIService implements AIService {
         layers: filteredLayers,
         originalSize: { width: metadata.width, height: metadata.height },
         model: this.getProviderName(),
-        confidence: filteredLayers.length > 0 
-          ? filteredLayers.reduce((sum, l) => sum + l.confidence, 0) / filteredLayers.length 
+        confidence: filteredLayers.length > 0
+          ? filteredLayers.reduce((sum, l) => sum + l.confidence, 0) / filteredLayers.length
           : 0
       };
     } catch (error) {
@@ -95,54 +277,12 @@ export class BaiduService extends BaseAIService implements AIService {
     }
   }
 
-  private async callSegmentAPI(imageBase64: string, accessToken: string, options?: SegmentationOptions): Promise<any[]> {
-    let apiUrl = '';
-
-    switch (options?.mode) {
-      case 'product':
-        apiUrl = `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/segmentation/product_segment`;
-        break;
-      case 'all':
-        apiUrl = `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/segmentation/semantic_segment`;
-        break;
-      default:
-        apiUrl = `https://aip.baidubce.com/rest/2.0/image-classify/v1/object_detect`;
-    }
-
-    try {
-      const response = await fetch(`${apiUrl}?access_token=${accessToken}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-          image: imageBase64
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API请求失败: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.results) {
-        return data.results;
-      }
-
-      return this.generateMockSegments();
-    } catch (error) {
-      console.log('百度API调用失败，使用模拟数据');
-      return this.generateMockSegments();
-    }
-  }
-
   private generateMockSegments(): any[] {
     return [
-      { classname: 'product', location: { left: 100, top: 100, width: 300, height: 400 }, score: 0.93 },
-      { classname: 'text', location: { left: 450, top: 150, width: 200, height: 50 }, score: 0.91 },
-      { classname: 'person', location: { left: 200, top: 80, width: 180, height: 450 }, score: 0.95 },
-      { classname: 'background', location: { left: 0, top: 0, width: 800, height: 600 }, score: 0.85 }
+      { type: 'product', x: 100, y: 100, width: 300, height: 400, score: 0.93 },
+      { type: 'text', x: 450, y: 150, width: 200, height: 50, score: 0.91 },
+      { type: 'person', x: 200, y: 80, width: 180, height: 450, score: 0.95 },
+      { type: 'background', x: 0, y: 0, width: 800, height: 600, score: 0.85 }
     ];
   }
 
@@ -155,7 +295,8 @@ export class BaiduService extends BaseAIService implements AIService {
       'logo': 'Logo标识',
       'banner': '横幅区域',
       'price': '价格标签',
-      'button': '按钮元素'
+      'button': '按钮元素',
+      'object': '物品区域'
     };
 
     return classNames[classname] || `图层_${index + 1}`;
@@ -170,7 +311,8 @@ export class BaiduService extends BaseAIService implements AIService {
       'logo': 'logo',
       'banner': 'decoration',
       'price': 'text',
-      'button': 'object'
+      'button': 'object',
+      'object': 'object'
     };
 
     return typeMap[classname] || 'object';

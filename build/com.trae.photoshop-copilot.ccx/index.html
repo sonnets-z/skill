@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI抠图助手</title>
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div class="plugin-container">
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🎨</span>
+                <span class="logo-text">AI抠图助手</span>
+            </div>
+            <div class="version">v1.0.0</div>
+        </header>
+
+        <main class="main-content">
+            <section class="section">
+                <h2 class="section-title">📷 图片处理</h2>
+                <div class="button-group">
+                    <button id="btn-analyze" class="btn btn-primary">
+                        <span class="btn-icon">🔍</span>
+                        分析图片
+                    </button>
+                    <button id="btn-cutout" class="btn btn-primary">
+                        <span class="btn-icon">✂️</span>
+                        AI智能抠图
+                    </button>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">⚙️ AI配置</h2>
+                <div class="form-group">
+                    <label class="label">AI提供商</label>
+                    <select id="ai-provider" class="select">
+                        <option value="aliyun">阿里云通义万相</option>
+                        <option value="tencent">腾讯云智绘</option>
+                        <option value="baidu">百度文心一格</option>
+                        <option value="zhipu">智谱AI</option>
+                        <option value="doubao">字节豆包</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="label">API密钥</label>
+                    <input type="password" id="api-key" class="input" placeholder="输入API密钥">
+                </div>
+                <div class="form-group" id="secret-key-group" style="display: none;">
+                    <label class="label">Secret密钥</label>
+                    <input type="password" id="secret-key" class="input" placeholder="输入Secret密钥">
+                </div>
+                <button id="btn-configure" class="btn btn-secondary">
+                    <span class="btn-icon">💾</span>
+                    保存配置
+                </button>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">🎯 抠图方案</h2>
+                <div class="technique-grid">
+                    <button class="technique-btn active" data-technique="ai-subject">
+                        <span class="technique-icon">🤖</span>
+                        <span class="technique-name">AI主体识别</span>
+                    </button>
+                    <button class="technique-btn" data-technique="pen-tool">
+                        <span class="technique-icon">✏️</span>
+                        <span class="technique-name">钢笔工具</span>
+                    </button>
+                    <button class="technique-btn" data-technique="channel">
+                        <span class="technique-icon">🎛️</span>
+                        <span class="technique-name">通道抠图</span>
+                    </button>
+                    <button class="technique-btn" data-technique="color-range">
+                        <span class="technique-icon">🎨</span>
+                        <span class="technique-name">色彩范围</span>
+                    </button>
+                    <button class="technique-btn" data-technique="select-mask">
+                        <span class="technique-icon">🎭</span>
+                        <span class="technique-name">Select and Mask</span>
+                    </button>
+                    <button class="technique-btn" data-technique="blend-if">
+                        <span class="technique-icon">✨</span>
+                        <span class="technique-name">Blend If</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">📊 分析结果</h2>
+                <div id="analysis-result" class="result-panel">
+                    <div class="empty-state">
+                        <span class="empty-icon">📋</span>
+                        <p>请先分析图片获取结果</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2 class="section-title">📦 导出选项</h2>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-highpass" checked>
+                        <span>高反差保留</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-masks" checked>
+                        <span>保留蒙版</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-shadows" checked>
+                        <span>保留阴影</span>
+                    </label>
+                </div>
+                <button id="btn-export" class="btn btn-primary">
+                    <span class="btn-icon">📥</span>
+                    导出PSD
+                </button>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="status-bar" id="status-bar">
+                <span class="status-icon">✅</span>
+                <span class="status-text">就绪</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="./js/main.js"></script>
+</body>
+</html>

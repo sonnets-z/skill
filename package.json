@@ -1,17 +1,20 @@
 {
-  "name": "psd-layer-splitter",
+  "name": "ai-cutout-assistant",
   "version": "1.0.0",
-  "description": "电商图片图层拆分技能",
+  "description": "Photoshop AI智能抠图助手插件",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "jest"
+    "test": "jest",
+    "build:plugin": "node build-plugin.js",
+    "build:all": "npm run build && npm run build:plugin"
   },
   "dependencies": {
     "psd": "^3.4.0",
     "sharp": "^0.32.0",
-    "jimp": "^0.16.13"
+    "jimp": "^0.16.13",
+    "archiver": "^8.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
