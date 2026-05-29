@@ -17,7 +17,7 @@ export class EcommerceLayerManager {
   async generateEcommerceLayers(
     imagePath: string,
     analysis: ImageAnalysis
-  ): Promise<DetailedLayer[]> {
+  ): Promise<{ layers: DetailedLayer[]; originalSize: { width: number; height: number } }> {
     const imageBuffer = await fs.promises.readFile(imagePath);
     const metadata = await sharp(imageBuffer).metadata();
     
@@ -58,7 +58,7 @@ export class EcommerceLayerManager {
 
     layers.push(this.createBackgroundLayer(width, height, order++));
 
-    return layers;
+    return { layers, originalSize: { width, height } };
   }
 
   private createProductLayer(width: number, height: number, order: number): DetailedLayer {
@@ -336,7 +336,8 @@ export class EcommerceLayerManager {
     analysis: ImageAnalysis,
     layers: DetailedLayer[],
     solution: any,
-    startTime: number
+    startTime: number,
+    originalSize: { width: number; height: number }
   ): ProcessingReport {
     const qualityScore = this.calculateQualityScore(analysis);
     const recommendations = this.generateDetailedRecommendations(analysis);
@@ -347,7 +348,8 @@ export class EcommerceLayerManager {
       layersGenerated: layers.length,
       processingTime: Date.now() - startTime,
       qualityScore,
-      recommendations
+      recommendations,
+      originalSize
     };
   }
 

@@ -208,7 +208,8 @@ export class PsdExporter {
     const channelData: Buffer[] = [];
     
     channels.forEach(() => {
-      const rleData = this.rleEncode(Buffer.concat(rawData).filter((_, i) => i % 4 === 0));
+      const channelPixels = Buffer.concat(rawData).filter((_, i) => i % 4 === 0);
+      const rleData = this.rleEncode(Buffer.from(channelPixels));
       const lineSizes = Buffer.alloc(height * 2);
       for (let i = 0; i < height; i++) {
         lineSizes.writeUInt16BE(0, i * 2);

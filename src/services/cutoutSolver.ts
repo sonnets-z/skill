@@ -73,16 +73,22 @@ export class CutoutSolutionSelector {
   }
 
   getTechniqueDescription(technique: CutoutTechnique): string {
-    const descriptions: Record<CutoutTechnique, string> = {
+    const descriptions: Partial<Record<CutoutTechnique, string>> = {
       pen_tool: '钢笔工具精准路径抠图 - 适合边缘锐利的产品，保证平滑无锯齿',
+      'pen-tool': '钢笔工具精准路径抠图 - 适合边缘锐利的产品，保证平滑无锯齿',
       ai_subject: 'AI主体识别与快速选择 - 智能定位主体，适合大多数场景',
+      'ai-subject': 'AI主体识别与快速选择 - 智能定位主体，适合大多数场景',
       channel: '通道抠图 - 完美处理发丝、毛发、透明材质等精细边缘',
       color_range: '色彩范围抠图 - 适合高反差背景，快速分离',
+      'color-range': '色彩范围抠图 - 适合高反差背景，快速分离',
       magic_quick: '魔棒与快速选择工具 - 适合简单背景，高效快捷',
+      'magic-quick': '魔棒与快速选择工具 - 适合简单背景，高效快捷',
       blend_if: 'Blend If透明融合 - 完美保留透明层次和反光',
-      select_mask: 'Select and Mask精修边缘 - 精细调整边缘，消除白边'
+      'blend-if': 'Blend If透明融合 - 完美保留透明层次和反光',
+      select_mask: 'Select and Mask精修边缘 - 精细调整边缘，消除白边',
+      'select-mask': 'Select and Mask精修边缘 - 精细调整边缘，消除白边'
     };
-    return descriptions[technique];
+    return descriptions[technique] || '未知抠图技术';
   }
 
   getEcommerceQualityChecklist(): string[] {

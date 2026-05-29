@@ -104,10 +104,11 @@ export const actions = {
 
         logger.info(`抠图方案选择: ${cutoutSolution.reason}`);
 
-        const detailedLayers = await layerManager.generateEcommerceLayers(imagePath, analysis);
+        const { layers: detailedLayers, originalSize: imgSize } = await layerManager.generateEcommerceLayers(imagePath, analysis);
         currentDetailedLayers = detailedLayers;
+        originalSize = imgSize;
 
-        const report = layerManager.generateProcessingReport(analysis, detailedLayers, cutoutSolution, startTime);
+        const report = layerManager.generateProcessingReport(analysis, detailedLayers, cutoutSolution, startTime, imgSize);
         lastProcessingReport = report;
 
         currentLayers = detailedLayers.map(l => ({
@@ -121,7 +122,6 @@ export const actions = {
           visible: l.visible,
           type: l.type === 'text' ? 'text' : 'image'
         }));
-        originalSize = { width: report.originalSize.width, height: report.originalSize.height };
 
         let exportMessage = '';
         if (outputPath) {

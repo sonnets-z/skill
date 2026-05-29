@@ -73,7 +73,7 @@ class EcommerceLayerManager {
             layers.push(this.createTransparentLayer(width, height, order++));
         }
         layers.push(this.createBackgroundLayer(width, height, order++));
-        return layers;
+        return { layers, originalSize: { width, height } };
     }
     createProductLayer(width, height, order) {
         return {
@@ -335,7 +335,7 @@ class EcommerceLayerManager {
             order
         };
     }
-    generateProcessingReport(analysis, layers, solution, startTime) {
+    generateProcessingReport(analysis, layers, solution, startTime, originalSize) {
         const qualityScore = this.calculateQualityScore(analysis);
         const recommendations = this.generateDetailedRecommendations(analysis);
         return {
@@ -344,7 +344,8 @@ class EcommerceLayerManager {
             layersGenerated: layers.length,
             processingTime: Date.now() - startTime,
             qualityScore,
-            recommendations
+            recommendations,
+            originalSize
         };
     }
     calculateQualityScore(analysis) {
