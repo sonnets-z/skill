@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.actions = void 0;
 exports.getSkillInfo = getSkillInfo;
 exports.executeAction = executeAction;
+exports.onMessage = onMessage;
 const layerSplitter_1 = require("./services/layerSplitter");
 const psdExporter_1 = require("./services/psdExporter");
 const aiModelManager_1 = require("./services/aiModelManager");
@@ -44,6 +45,8 @@ const cutoutSolver_1 = require("./services/cutoutSolver");
 const ecommerceLayerManager_1 = require("./services/ecommerceLayerManager");
 const aiModels_1 = require("./types/aiModels");
 const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const os = __importStar(require("os"));
 const layerSplitter = new layerSplitter_1.LayerSplitter();
 const psdExporter = new psdExporter_1.PsdExporter();
 const imageAnalyzer = new imageAnalyzer_1.ImageAnalyzer();
@@ -216,8 +219,7 @@ exports.actions = {
                     const exportResult = await psdExporter.exportPsd({
                         layers: currentLayers,
                         outputPath,
-                        width: result.originalSize.width,
-                        height: result.originalSize.height
+                        width: result.originalSize.width, height: result.originalSize.height
                     });
                     if (exportResult.success) {
                         return {
@@ -517,5 +519,146 @@ async function executeAction(actionId, context) {
             success: false,
             message: `执行失败: ${error.message}`
         };
+    }
+}
+async function saveAttachmentToTempFile(attachment) {
+    const tempDir = os.tmpdir();
+    const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+    const fileName = `${uniqueId}_${attachment.name}`;
+    const filePath = path.join(tempDir, fileName);
+    if (attachment.data) {
+        await fs.promises.writeFile(filePath, attachment.data);
+    }
+    else if (attachment.path && fs.existsSync(attachment.path)) {
+        await fs.promises.copyFile(attachment.path, filePath);
+    }
+    else if (attachment.url) {
+        throw new Error('URL下载功能需要外部库支持');
+    }
+    else {
+        throw new Error('没有可用的文件数据');
+    }
+    return filePath;
+}
+async function onMessage(context) {
+    const { message, attachments, logger, reply } = context;
+    if (attachments && attachments.length > 0) {
+        const imageAttachment = attachments.find(att => att.mimeType.startsWith('image/'));
+        if (imageAttachment) {
+            logger.info(`收到图片附件: ${imageAttachment.name}`);
+            try {
+                await reply('正在处理您的图片，请稍候...', {
+                    quickReplies: ['查看分析结果', '获取PSD文件']
+                });
+                const imagePath = await saveAttachmentToTempFile(imageAttachment);
+                logger.info(`图片已保存到临时文件: ${imagePath}`);
+                const startTime = Date.now();
+                const analysis = await imageAnalyzer.analyzeImage(imagePath);
+                lastAnalysis = analysis;
+                const cutoutSolution = cutoutSelector.selectSolution(analysis);
+                lastCutoutSolution = cutoutSolution;
+                const { layers: detailedLayers, originalSize: imgSize } = await layerManager.generateEcommerceLayers(imagePath, analysis);
+                currentDetailedLayers = detailedLayers;
+                originalSize = imgSize;
+                const report = layerManager.generateProcessingReport(analysis, detailedLayers, cutoutSolution, startTime, imgSize);
+                lastProcessingReport = report;
+                currentLayers = detailedLayers.map(l => ({
+                    id: l.id,
+                    name: l.name,
+                    x: l.x,
+                    y: l.y,
+                    width: l.width,
+                    height: l.height,
+                    opacity: l.opacity,
+                    visible: l.visible,
+                    type: l.type === 'text' ? 'text' : 'image'
+                }));
+                const psdOutputPath = path.join(os.tmpdir(), `${Date.now()}_photoshop_cutout.psd`);
+                await psdExporter.exportEcommercePsd(detailedLayers, psdOutputPath, report.originalSize.width, report.originalSize.height, {
+                    includeHighPass: true,
+                    includeFrequencySeparation: false,
+                    includeBlendIf: analysis.hasTransparentMaterial,
+                    preserveBackground: !analysis.isWhiteBackground,
+                    preserveShadows: analysis.hasShadow,
+                    exportTransparent: true,
+                    addSmartObjects: true
+                });
+                const psdAttachment = {
+                    id: `psd_${Date.now()}`,
+                    name: 'photoshop_cutout.psd',
+                    url: `file://${psdOutputPath}`,
+                    mimeType: 'application/psd',
+                    size: fs.statSync(psdOutputPath).size,
+                    path: psdOutputPath
+                };
+                const resultMessage = [
+                    `🎨 Photoshop商业级智能抠图处理完成！`,
+                    ``,
+                    `📊 图片分析结果:`,
+                    `- 产品类型: ${analysis.productType}`,
+                    `- 背景: ${analysis.isWhiteBackground ? '白底' : '非白底'}`,
+                    `- 背景复杂度: ${analysis.backgroundComplexity}`,
+                    `- 是否有人物: ${analysis.hasModel ? '是' : '否'}`,
+                    `- 是否有毛发: ${analysis.hasHair ? '是' : '否'}`,
+                    `- 是否有透明材质: ${analysis.hasTransparentMaterial ? '是' : '否'}`,
+                    ``,
+                    `💡 抠图方案:`,
+                    `${cutoutSolution.reason} (置信度: ${(cutoutSolution.confidence * 100).toFixed(0)}%)`,
+                    ``,
+                    `📦 处理结果:`,
+                    `- 质量评分: ${report.qualityScore}/100`,
+                    `- 图层数量: ${detailedLayers.length}`,
+                    `- 处理时间: ${(report.processingTime / 1000).toFixed(1)}秒`
+                ].join('\n');
+                await reply(resultMessage, {
+                    attachments: [psdAttachment],
+                    quickReplies: ['查看详细图层', '获取抠图指南', '再次处理']
+                });
+            }
+            catch (error) {
+                logger.error(`处理图片失败: ${error.message}`);
+                await reply(`抱歉，处理图片时出错: ${error.message}\n请稍后重试或联系技术支持。`, {
+                    quickReplies: ['重新上传', '手动使用工具']
+                });
+            }
+        }
+        else {
+            await reply('我只支持处理图片文件，请上传一张图片，我会为您进行智能抠图处理！', {
+                quickReplies: ['上传图片']
+            });
+        }
+    }
+    else if (message.toLowerCase().includes('你好') || message.toLowerCase().includes('hi') || message.toLowerCase().includes('hello')) {
+        await reply('你好！👋 我是Photoshop商业级智能抠图专家。请上传一张图片，我会为您自动进行专业的抠图处理！', {
+            quickReplies: ['上传图片', '了解功能']
+        });
+    }
+    else if (message.toLowerCase().includes('功能') || message.toLowerCase().includes('帮助')) {
+        await reply(`📚 Photoshop商业级智能抠图功能介绍：
+
+🎯 核心能力：
+- 钢笔工具精准路径抠图
+- AI主体识别
+- 通道抠发丝
+- 色彩范围抠图
+- 蒙版精修
+- 透明材质处理
+
+📁 使用方式：
+直接上传图片即可自动进行智能抠图处理！
+
+💡 还可以使用的工具：
+- photoshop-cutout - Photoshop商业级智能抠图
+- ai-split-image - AI智能拆分图层
+- export-psd - 导出PSD文件
+
+有什么需要帮助的吗？`, {
+            quickReplies: ['上传图片', '开始抠图']
+        });
+    }
+    else {
+        await reply('请上传一张图片，我会为您进行Photoshop商业级智能抠图处理！🎨', {
+            quickReplies: ['上传图片', '了解功能']
+        });
     }
 }
