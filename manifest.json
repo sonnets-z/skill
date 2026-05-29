@@ -1,12 +1,12 @@
 {
   "name": "psd-layer-splitter",
-  "version": "2.0.0",
-  "title": "电商图片图层拆分",
-  "description": "将电商图片的每个图层模块拆分成可编辑的 PSD 图层效果，并可以导出 PSD 文件。支持阿里云通义万相、腾讯云智绘、百度文心一格、智谱AI、字节豆包等国内主流AI模型",
+  "version": "3.0.0",
+  "title": "Photoshop商业级电商图片图层拆分",
+  "description": "专业级电商图片抠图工具，集成Photoshop专业技术和国内主流AI模型。支持钢笔工具、通道抠图、Select and Mask等专业抠图方案，可生成高质量PSD分层文件",
   "author": "Trae Skill",
   "icon": "icon.png",
   "category": "图像处理",
-  "tags": ["PSD", "图层", "电商", "图片处理", "AI分割", "智能分割"],
+  "tags": ["PSD", "图层", "电商", "图片处理", "AI分割", "智能分割", "Photoshop", "抠图", "通道抠图", "白底图"],
   "main": "src/index.ts",
   "requirements": {
     "trae": ">=1.0.0"
@@ -60,7 +60,63 @@
       "website": "https://www.volcengine.com/product/doubao"
     }
   ],
+  "cutoutTechniques": [
+    {
+      "id": "pen-tool",
+      "name": "钢笔工具",
+      "description": "精确路径抠图，适合边缘锐利产品，确保边缘平滑无锯齿"
+    },
+    {
+      "id": "ai-subject",
+      "name": "AI主体识别",
+      "description": "智能识别主体，适合多数场景"
+    },
+    {
+      "id": "channel",
+      "name": "通道抠图",
+      "description": "适合发丝、毛发、透明材质"
+    },
+    {
+      "id": "color-range",
+      "name": "色彩范围",
+      "description": "适合高反差背景"
+    },
+    {
+      "id": "magic-quick",
+      "name": "魔棒/快速选择",
+      "description": "适合简单背景"
+    },
+    {
+      "id": "blend-if",
+      "name": "Blend If",
+      "description": "适合透明材质和反光"
+    },
+    {
+      "id": "select-mask",
+      "name": "Select and Mask",
+      "description": "边缘精修工具"
+    }
+  ],
   "actions": [
+    {
+      "id": "photoshop-cutout",
+      "name": "Photoshop商业级智能抠图",
+      "description": "使用Photoshop专业技术智能分析并处理电商图片抠图，自动选择最佳方案",
+      "parameters": [
+        {
+          "name": "imagePath",
+          "type": "string",
+          "required": true,
+          "description": "输入图片路径"
+        },
+        {
+          "name": "outputPath",
+          "type": "string",
+          "required": false,
+          "description": "输出 PSD 文件路径"
+        }
+      ]
+    },
     {
       "id": "split-image",
       "name": "拆分图片图层（本地）",
@@ -160,13 +216,32 @@
           "type": "string",
           "required": true,
           "description": "输出 PSD 文件路径"
+        },
+        {
+          "name": "useEcommerceMode",
+          "type": "boolean",
+          "required": false,
+          "description": "使用商业级电商PSD导出模式",
+          "default": true
         }
       ]
+    },
+    {
+      "id": "get-analysis",
+      "name": "获取图片分析结果",
+      "description": "获取最后一次处理的图片分析结果、抠图方案和质量报告",
+      "parameters": []
     },
     {
       "id": "get-layers",
       "name": "获取图层列表",
       "description": "获取当前已拆分的图层列表及AI分割详情",
+      "parameters": []
+    },
+    {
+      "id": "get-cutout-guide",
+      "name": "获取Photoshop抠图指南",
+      "description": "根据图片特征获取详细的Photoshop抠图操作指南",
       "parameters": []
     },
     {
