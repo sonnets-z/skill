@@ -1,0 +1,59 @@
+{
+  "name": "psd-layer-splitter",
+  "version": "1.0.0",
+  "title": "电商图片图层拆分",
+  "description": "将电商图片的每个图层模块拆分成可编辑的 PSD 图层效果，并可以导出 PSD 文件",
+  "author": "Trae Skill",
+  "icon": "icon.png",
+  "category": "图像处理",
+  "tags": ["PSD", "图层", "电商", "图片处理"],
+  "main": "src/index.ts",
+  "requirements": {
+    "trae": ">=1.0.0"
+  },
+  "capabilities": [
+    "image_processing",
+    "file_export"
+  ],
+  "actions": [
+    {
+      "id": "split-image",
+      "name": "拆分图片图层",
+      "description": "将电商图片拆分为多个可编辑的图层模块",
+      "parameters": [
+        {
+          "name": "imagePath",
+          "type": "string",
+          "required": true,
+          "description": "输入图片路径"
+        },
+        {
+          "name": "outputPath",
+          "type": "string",
+          "required": false,
+          "description": "输出 PSD 文件路径"
+        }
+      ]
+    },
+    {
+      "id": "export-psd",
+      "name": "导出 PSD 文件",
+      "description": "将拆分后的图层导出为 PSD 文件",
+      "parameters": [
+        {
+          "name": "layers",
+          "type": "array",
+          "required": true,
+          "description": "图层数据数组"
+        },
+        {
+          "name": "outputPath",
+          "type": "string",
+          "required": true,
+          "description": "输出 PSD 文件路径"
+        }
+      ]
+    }
+  ],
+  "settings": []
+}
